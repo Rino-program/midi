@@ -84,7 +84,7 @@ export class SMFBuilder {
 
   download(notes: MIDINote[], filename = 'output.mid'): void {
     const data = this.build(notes);
-    const blob = new Blob([data.buffer as ArrayBuffer], { type: 'audio/midi' });
+    const blob = new Blob([data.buffer as ArrayBuffer], { type: 'audio/x-midi' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

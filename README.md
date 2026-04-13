@@ -1,73 +1,68 @@
-# React + TypeScript + Vite
+# AudioMIDI Bridge Web
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A browser-based **Audio → MIDI converter** that runs entirely client-side — no server required. Record from your microphone, capture browser tab audio, or process audio/video files to extract pitch data and export Standard MIDI Files.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- 🎤 **Microphone input** — real-time pitch detection from mic
+- 🔊 **Tab audio capture** — capture audio from any browser tab (Chrome)
+- 🎵 **Audio file processing** — MP3, WAV, FLAC, OGG, M4A, AAC
+- 🎬 **Video file processing** — MP4, WebM, MOV (audio track extracted)
+- 🎹 **Piano roll visualizer** — Canvas 2D rendering of detected notes
+- 🎼 **MIDI export** — download Standard MIDI File (SMF format 1)
+- 🔌 **Web MIDI output** — route notes to connected MIDI devices in real time
+- ⚙️ **Configurable detection** — YIN, Essentia, or Crepe pitch algorithms; confidence threshold; quantize grid
+- 📱 **PWA** — installable, works offline
 
-## React Compiler
+## Tech Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+| Layer | Library |
+|---|---|
+| UI | React 18, TypeScript 5, Vite 5 |
+| Styling | Tailwind CSS 3, framer-motion 11 |
+| State | zustand 4 (with localStorage persistence) |
+| Pitch | YIN algorithm in Web Worker |
+| MIDI | Web MIDI API + custom SMF builder |
+| Rendering | Canvas 2D (piano roll) |
+| PWA | vite-plugin-pwa + Workbox |
 
-## Expanding the ESLint configuration
+## Getting Started
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Open [http://localhost:5173](http://localhost:5173).
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Build
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run build
 ```
+
+Output is in `dist/`. Serve with any static file server.
+
+## Usage
+
+1. **Select input source** — choose Microphone, Tab, Audio File, or Video File
+2. For file modes — drag & drop a file onto the drop zone or click to browse
+3. For live modes — click **▶ Start Recording** (browser will request microphone/tab permission)
+4. Watch notes appear on the piano roll in real time
+5. Click **⬇ Export MIDI** to download a `.mid` file
+6. Adjust **Settings** to tune detection sensitivity and quantization
+
+## Architecture
+
+```
+src/
+├── audio/          AudioInputManager, FileDecodeEngine
+├── pitch/          PitchDetectionWorker (YIN), OnsetDetectionWorker (HFC)
+├── midi/           MIDIConverter, SMFBuilder, MIDIOutputManager
+├── video/          VideoSyncController
+├── visualizer/     PianoRollVisualizer (Canvas 2D)
+├── store/          useStore (zustand)
+└── components/     App.tsx
+```
+
+All audio processing runs in Web Workers; the main thread stays responsive.
