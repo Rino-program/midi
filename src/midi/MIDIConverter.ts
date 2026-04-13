@@ -10,7 +10,7 @@ export interface NoteEvent {
 }
 
 export class MIDIConverter {
-  private activeNotes: Map<number, { startTime: number; velocity: number }> = new Map();
+  private activeNotes: Map<number, { startTime: number; velocity: number; confidence: number }> = new Map();
   private minConfidence: number;
   private minNoteDurationMs: number;
   private onNoteEvent?: (event: NoteEvent) => void;
@@ -70,7 +70,7 @@ export class MIDIConverter {
             velocity: noteData.velocity,
             startTime: noteData.startTime,
             duration: duration / 1000,
-            confidence: noteData.velocity / 127,
+            confidence: noteData.confidence,
           });
         }
         this.activeNotes.delete(note);
@@ -79,7 +79,7 @@ export class MIDIConverter {
 
     if (!this.activeNotes.has(midiNote)) {
       const velocity = Math.round(Math.min(127, confidence * 127));
-      this.activeNotes.set(midiNote, { startTime: timeOffset, velocity });
+      this.activeNotes.set(midiNote, { startTime: timeOffset, velocity, confidence });
       this.onNoteEvent?.({
         type: 'noteOn',
         note: midiNote,
@@ -105,7 +105,7 @@ export class MIDIConverter {
         velocity: noteData.velocity,
         startTime: noteData.startTime,
         duration: Math.max(duration / 1000, this.minNoteDurationMs / 1000),
-        confidence: noteData.velocity / 127,
+        confidence: noteData.confidence,
       });
     });
     this.activeNotes.clear();

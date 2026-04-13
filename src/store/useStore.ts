@@ -40,7 +40,7 @@ export interface UIState {
 }
 
 const defaultSettings: Settings = {
-  detectionMode: 'essentia',
+  detectionMode: 'yin',
   minConfidence: 0.5,
   quantizeGrid: 50,
   velocityScale: 1.0,

@@ -26,8 +26,8 @@ export class SMFBuilder {
     });
 
     for (const note of notes) {
-      const onTick = Math.round(note.startTime * (1_000_000 / this.tempo) * this.ppq);
-      const offTick = Math.round((note.startTime + note.duration) * (1_000_000 / this.tempo) * this.ppq);
+      const onTick = Math.round(note.startTime * this.ppq * 1_000_000 / this.tempo);
+      const offTick = Math.round((note.startTime + note.duration) * this.ppq * 1_000_000 / this.tempo);
       const vel = Math.max(1, Math.min(127, Math.round(note.velocity)));
 
       events.push({ tick: onTick, data: [0x90, note.pitch, vel] });

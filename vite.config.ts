@@ -9,7 +9,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,wasm}'],
-        maximumFileSizeToCacheInBytes: 30 * 1024 * 1024,
+        maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
       },
       manifest: {
         name: 'AudioMIDI Bridge Web',
