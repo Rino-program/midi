@@ -55,7 +55,7 @@ export class AudioInputManager {
 
   private async initTabCapture(): Promise<void> {
     this.stream = await navigator.mediaDevices.getDisplayMedia({
-      audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false },
+      audio: true,
       video: false,
     } as MediaStreamConstraints);
     this.sourceNode = this.audioContext!.createMediaStreamSource(this.stream);

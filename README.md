@@ -19,7 +19,7 @@ A browser-based **Audio → MIDI converter** that runs entirely client-side — 
 | Layer | Library |
 |---|---|
 | UI | React 18, TypeScript 5, Vite 5 |
-| Styling | Tailwind CSS 3, framer-motion 11 |
+| Styling | Tailwind CSS 3, framer-motion 12 |
 | State | zustand 4 (with localStorage persistence) |
 | Pitch | YIN algorithm in Web Worker |
 | MIDI | Web MIDI API + custom SMF builder |
