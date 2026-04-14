@@ -277,36 +277,50 @@ export const App: React.FC = () => {
 
       setProcessing(true, 50, 'Detecting pitch...');
 
-      let processed = 0;
+      const analysisWindow = 2048;
+      const hopSize = Math.max(128, settings.hopSize);
+      let processedFrames = 0;
+
+      const totalFrames = chunks.reduce((count, chunk) => {
+        if (chunk.pcm.length <= analysisWindow) return count + 1;
+        return count + Math.ceil((chunk.pcm.length - analysisWindow) / hopSize) + 1;
+      }, 0);
 
       for (const chunk of chunks) {
-        await new Promise<void>((resolve) => {
-          const worker = pitchWorkerRef.current!;
+        for (let frameStart = 0; frameStart < chunk.pcm.length; frameStart += hopSize) {
+          const frameEnd = Math.min(frameStart + analysisWindow, chunk.pcm.length);
+          const frame = new Float32Array(analysisWindow);
+          frame.set(chunk.pcm.subarray(frameStart, frameEnd));
 
-          const handler = (event: MessageEvent) => {
-            if (event.data.type === 'result') {
-              worker.removeEventListener('message', handler);
-              midiConverterRef.current?.processPitchResult(event.data.payload);
-              resolve();
-            } else if (event.data.type === 'error') {
-              worker.removeEventListener('message', handler);
-              resolve();
-            }
-          };
+          await new Promise<void>((resolve) => {
+            const worker = pitchWorkerRef.current!;
 
-          worker.addEventListener('message', handler);
-          worker.postMessage({
-            type: 'detect',
-            payload: { pcm: chunk.pcm.buffer, timeOffset: chunk.timeOffset },
-          }, [chunk.pcm.buffer]);
-        });
+            const handler = (event: MessageEvent) => {
+              if (event.data.type === 'result' || event.data.type === 'error') {
+                worker.removeEventListener('message', handler);
+                resolve();
+              }
+            };
 
-        processed++;
-        setProcessing(
-          true,
-          50 + (processed / chunks.length) * 45,
-          `Processing chunk ${processed}/${chunks.length}...`
-        );
+            worker.addEventListener('message', handler);
+            worker.postMessage({
+              type: 'detect',
+              payload: {
+                pcm: frame.buffer,
+                timeOffset: chunk.timeOffset + frameStart / settings.sampleRate,
+              },
+            }, [frame.buffer]);
+          });
+
+          processedFrames++;
+          setProcessing(
+            true,
+            50 + (processedFrames / Math.max(totalFrames, 1)) * 45,
+            `Analyzing ${processedFrames}/${totalFrames} frames...`
+          );
+
+          if (frameEnd === chunk.pcm.length) break;
+        }
       }
 
       const lastChunk = chunks[chunks.length - 1];
@@ -325,7 +339,7 @@ export const App: React.FC = () => {
       setProcessing(false);
       setStatus('error', (err as Error).message);
     }
-  }, [settings.sampleRate, clearNotes, setProcessing, setNotes, setStatus]);
+  }, [settings.sampleRate, settings.hopSize, clearNotes, setProcessing, setNotes, setStatus]);
 
   const prepareMediaPreview = useCallback((file: File) => {
     setMediaUrl((previousUrl) => {
