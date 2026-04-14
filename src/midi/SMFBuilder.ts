@@ -82,9 +82,24 @@ export class SMFBuilder {
     return bytes;
   }
 
+  private isValidSMF(data: Uint8Array): boolean {
+    if (data.length < 14) return false;
+    return (
+      data[0] === 0x4d && // M
+      data[1] === 0x54 && // T
+      data[2] === 0x68 && // h
+      data[3] === 0x64 // d
+    );
+  }
+
   download(notes: MIDINote[], filename = 'output.mid'): void {
     const data = this.build(notes);
-    const blob = new Blob([data.buffer instanceof ArrayBuffer ? data.buffer : new Uint8Array(data)], { type: 'audio/x-midi' });
+    if (!this.isValidSMF(data)) {
+      throw new Error('Generated file is not a valid MIDI SMF.');
+    }
+
+    const raw = Uint8Array.from(data).buffer;
+    const blob = new Blob([raw], { type: 'audio/midi' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

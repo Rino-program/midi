@@ -379,8 +379,12 @@ export const App: React.FC = () => {
 
   const handleDownloadMIDI = useCallback(() => {
     if (notes.length === 0) return;
-    smfBuilderRef.current.download(notes, 'output.mid');
-  }, [notes]);
+    try {
+      smfBuilderRef.current.download(notes, 'output.mid');
+    } catch (err) {
+      setStatus('error', (err as Error).message);
+    }
+  }, [notes, setStatus]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
