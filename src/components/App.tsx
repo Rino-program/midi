@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../store/useStore';
 import { AudioInputManager } from '../audio/AudioInputManager';
@@ -156,11 +156,14 @@ export const App: React.FC = () => {
   const midiConverterRef = useRef<MIDIConverter | null>(null);
   const midiOutputRef = useRef<MIDIOutputManager | null>(null);
   const smfBuilderRef = useRef<SMFBuilder>(new SMFBuilder(480, 120));
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const mediaElementRef = useRef<HTMLMediaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pitchWorkerRef = useRef<Worker | null>(null);
   const recordedNotesRef = useRef<MIDINote[]>([]);
   const startTimeRef = useRef<number>(0);
+  const [mediaUrl, setMediaUrl] = useState<string | null>(null);
+  const [mediaDuration, setMediaDuration] = useState<number>(0);
+  const [isMediaPlaying, setIsMediaPlaying] = useState<boolean>(false);
 
   useEffect(() => {
     const midiOut = new MIDIOutputManager();
@@ -324,6 +327,42 @@ export const App: React.FC = () => {
     }
   }, [settings.sampleRate, clearNotes, setProcessing, setNotes, setStatus]);
 
+  const prepareMediaPreview = useCallback((file: File) => {
+    setMediaUrl((previousUrl) => {
+      if (previousUrl) URL.revokeObjectURL(previousUrl);
+      return URL.createObjectURL(file);
+    });
+    setMediaDuration(0);
+    setCurrentTime(0);
+    setIsMediaPlaying(false);
+  }, [setCurrentTime]);
+
+  const handleFileSelected = useCallback((file: File) => {
+    prepareMediaPreview(file);
+    void handleFileProcess(file);
+  }, [prepareMediaPreview, handleFileProcess]);
+
+  const handleSeek = useCallback((nextTime: number) => {
+    const media = mediaElementRef.current;
+    if (!media) return;
+    media.currentTime = nextTime;
+    setCurrentTime(nextTime);
+  }, [setCurrentTime]);
+
+  const handleRestartPlay = useCallback(async () => {
+    const media = mediaElementRef.current;
+    if (!media) return;
+    media.currentTime = 0;
+    setCurrentTime(0);
+    await media.play();
+  }, [setCurrentTime]);
+
+  useEffect(() => {
+    return () => {
+      if (mediaUrl) URL.revokeObjectURL(mediaUrl);
+    };
+  }, [mediaUrl]);
+
   const handleDownloadMIDI = useCallback(() => {
     if (notes.length === 0) return;
     smfBuilderRef.current.download(notes, 'output.mid');
@@ -332,8 +371,8 @@ export const App: React.FC = () => {
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
-    if (file) handleFileProcess(file);
-  }, [handleFileProcess]);
+    if (file) handleFileSelected(file);
+  }, [handleFileSelected]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
@@ -388,17 +427,88 @@ export const App: React.FC = () => {
           accept={inputMode === 'videoFile' ? 'video/*' : 'audio/*'}
           onChange={(e) => {
             const file = e.target.files?.[0];
-            if (file) handleFileProcess(file);
+            if (file) handleFileSelected(file);
             e.target.value = '';
           }}
         />
 
-        {inputMode === 'videoFile' && (
-          <video
-            ref={videoRef}
-            className="w-full rounded-lg bg-black max-h-48 hidden"
-            controls
-          />
+        {(inputMode === 'audioFile' || inputMode === 'videoFile') && mediaUrl && (
+          <section className="space-y-3 rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+            {inputMode === 'videoFile' ? (
+              <video
+                ref={(el) => {
+                  mediaElementRef.current = el;
+                }}
+                src={mediaUrl}
+                className="w-full rounded-lg bg-black max-h-64"
+                onLoadedMetadata={(e) => {
+                  const duration = Number.isFinite(e.currentTarget.duration) ? e.currentTarget.duration : 0;
+                  setMediaDuration(duration);
+                  setCurrentTime(0);
+                }}
+                onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+                onPlay={() => setIsMediaPlaying(true)}
+                onPause={() => setIsMediaPlaying(false)}
+                onEnded={() => setIsMediaPlaying(false)}
+              />
+            ) : (
+              <audio
+                ref={(el) => {
+                  mediaElementRef.current = el;
+                }}
+                src={mediaUrl}
+                className="w-full"
+                onLoadedMetadata={(e) => {
+                  const duration = Number.isFinite(e.currentTarget.duration) ? e.currentTarget.duration : 0;
+                  setMediaDuration(duration);
+                  setCurrentTime(0);
+                }}
+                onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+                onPlay={() => setIsMediaPlaying(true)}
+                onPause={() => setIsMediaPlaying(false)}
+                onEnded={() => setIsMediaPlaying(false)}
+              />
+            )}
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => {
+                  const media = mediaElementRef.current;
+                  if (!media) return;
+                  if (isMediaPlaying) {
+                    media.pause();
+                  } else {
+                    void media.play();
+                  }
+                }}
+                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                {isMediaPlaying ? '⏸ Pause' : '▶ Play'}
+              </button>
+              <button
+                onClick={() => {
+                  void handleRestartPlay();
+                }}
+                className="px-4 py-2 bg-green-700 hover:bg-green-600 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                ⏮ Play from Start
+              </button>
+              <span className="text-xs text-slate-400 min-w-28 text-right">
+                {currentTime.toFixed(1)}s / {mediaDuration.toFixed(1)}s
+              </span>
+            </div>
+
+            <input
+              type="range"
+              min={0}
+              max={mediaDuration || 0}
+              step={0.01}
+              value={Math.min(currentTime, mediaDuration || 0)}
+              onChange={(e) => handleSeek(parseFloat(e.target.value))}
+              disabled={mediaDuration <= 0}
+              className="w-full accent-green-500 disabled:opacity-40"
+            />
+          </section>
         )}
 
         <section>

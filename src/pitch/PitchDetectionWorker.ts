@@ -20,41 +20,56 @@ export interface WorkerResponse {
   payload: unknown;
 }
 
-// YIN pitch detection algorithm (simplified)
-function yinPitch(buffer: Float32Array, sampleRate: number, threshold = 0.15): { frequency: number; confidence: number } {
+// YIN pitch detection algorithm (optimized for MIDI note range)
+function yinPitch(
+  buffer: Float32Array,
+  sampleRate: number,
+  threshold = 0.15,
+  minFrequencyHz = 27.5,
+  maxFrequencyHz = 4186.01
+): { frequency: number; confidence: number } {
   const bufferSize = buffer.length;
   const halfSize = Math.floor(bufferSize / 2);
-  const yinBuffer = new Float32Array(halfSize);
 
-  // Step 1: Difference function
-  for (let tau = 0; tau < halfSize; tau++) {
-    yinBuffer[tau] = 0;
-    for (let j = 0; j < halfSize; j++) {
+  const minTau = Math.max(2, Math.floor(sampleRate / maxFrequencyHz));
+  const maxTau = Math.min(halfSize - 1, Math.floor(sampleRate / minFrequencyHz));
+
+  if (maxTau <= minTau) {
+    return { frequency: 0, confidence: 0 };
+  }
+
+  const yinBuffer = new Float32Array(maxTau + 1);
+  const compareLength = bufferSize - maxTau;
+
+  // Step 1: Difference function (restricted tau range for valid MIDI pitches)
+  for (let tau = minTau; tau <= maxTau; tau++) {
+    let sum = 0;
+    for (let j = 0; j < compareLength; j++) {
       const delta = buffer[j] - buffer[j + tau];
-      yinBuffer[tau] += delta * delta;
+      sum += delta * delta;
     }
+    yinBuffer[tau] = sum;
   }
 
   // Step 2: Cumulative mean normalized difference
-  yinBuffer[0] = 1;
   let runningSum = 0;
-  for (let tau = 1; tau < halfSize; tau++) {
+  for (let tau = minTau; tau <= maxTau; tau++) {
     runningSum += yinBuffer[tau];
-    yinBuffer[tau] *= tau / runningSum;
+    yinBuffer[tau] = runningSum > 0 ? (yinBuffer[tau] * tau) / runningSum : 1;
   }
 
   // Step 3: Absolute threshold
-  let tau = 2;
-  while (tau < halfSize) {
+  for (let tau = minTau; tau <= maxTau; tau++) {
     if (yinBuffer[tau] < threshold) {
-      while (tau + 1 < halfSize && yinBuffer[tau + 1] < yinBuffer[tau]) {
-        tau++;
+      let bestTau = tau;
+      while (bestTau + 1 <= maxTau && yinBuffer[bestTau + 1] < yinBuffer[bestTau]) {
+        bestTau++;
       }
-      const frequency = sampleRate / tau;
-      const confidence = 1 - yinBuffer[tau];
+
+      const frequency = sampleRate / bestTau;
+      const confidence = 1 - yinBuffer[bestTau];
       return { frequency, confidence };
     }
-    tau++;
   }
 
   return { frequency: 0, confidence: 0 };
